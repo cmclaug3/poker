@@ -24,8 +24,8 @@ class Card(object):
 
 class Deck(object):
 
-    VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
-    SUITS = ['h', 'd', 's', 'c']
+    VALUES = ('2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A')
+    SUITS = ('h', 'd', 's', 'c')
 
     def __init__(self):
         self.cards = list()
@@ -83,19 +83,16 @@ class PokerGame(object):
     def add_player(self, player_name):
         self.players.append(Player(player_name))
 
-    def play_one_round(self):
-        print(self.deck)
-        round_community_cards = self.deck.deal(5)
+    def remove_player(self, player_name):
+        pass
+
+    def simulate_round(self):
+        community_cards = self.deck.deal(5)
         for player in self.players:
             player.hand = self.deck.deal(2)
-            player.hand += round_community_cards
-            self.final_dict[player] = player.hand
-            
-        print(self.deck)
-        print(self.final_dict)
-        
-    def round_rankings(self, final_dict):
-        pass
+            player.hand += community_cards
+        print(PokerHandRanker().compare(self.players))
+
 
 
 
@@ -103,103 +100,136 @@ class PokerHandRanker(object):
 
     RANKING = ('Royal Flush', 'Straight Flush', 'Four of Kind', 'Full House',
          'Flush', 'Straight', 'Three of Kind', 'Two Pair', 'Pair', 'High Card')
-    
-    def __init__(self, cards):
-        self.cards = cards
-        self.value_count = dict(Counter([i.value for i in self.cards]))
-        self.suit_count = dict(Counter([i.suit for i in self.cards]))
 
-    def get_high_card(self):
+
+    def _get_value_count(self, cards):
+        return dict(Counter([i.value for i in cards]))
+
+
+    def _get_suit_count(self, cards):
+        return dict(Counter([i.suit for i in cards]))
+
+
+    def get_high_card(self, cards):
         tester = 0
-        for card in self.cards:
+        for card in cards:
             if card.get_card_value() > tester:
                 winner = card
                 tester = winner.get_card_value()
-        return str(winner)
-
-
-
-
-# Figure out how to attach "TIEBREAKER/(card)" needs...
+        return winner
 
     
-    def has_pair(self):
-        values = [i.value for i in self.cards]
+    def has_pair(self, cards):
+        values = [i.value for i in cards]
         if len(set(values)) == len(values):
             return False
-        return True
+        for val, occurances in self._get_value_count(cards).items():
+            if occurances == 2:
+                return val
         
 
-    def has_two_pair(self):
-        value_list = [s for v, s in self.value_count.items()]
+    def has_two_pair(self, cards):
+        value_list = [s for v, s in self._get_value_count(cards).items()]
+        vals = []
         if value_list.count(2) == 2:
-            return True
+            for x, y in self._get_value_count(cards).items():
+                if y == 2:
+                    vals.append(x)
+            return vals
         return False
-                    
-    def has_3ok(self): #####
-        for k, v in self.value_count.items():
+
+                   
+    def has_3ok(self, cards): 
+        for k, v in self._get_value_count(cards).items():
             if v >= 3:
-                return 'True {}\'s'.format(k)
+                return k
         return False
 
 
 
-    def has_straight(self):
+
+    def has_straight(self, cards):
         return False
 
 
 
-    def has_flush(self):
-        suit_list = [s for v, s in self.suit_count.items()]
+
+    def has_flush(self, cards):
+        suit_list = [s for v, s in self._get_suit_count(cards).items()]
         if suit_list.count(5) == 1:
-            return True
+            for x, y in self._get_suit_count(cards).items():
+                if y == 5:
+                    flush_cards = [i for i in cards if i.suit == x]
+                    sorted_flush_cards = sorted(flush_cards, key=lambda x: x.get_card_value(), reverse=True)
+                    return [x, sorted_flush_cards[0]]
         return False
 
-    def has_full_house(self):
-        value_list = [s for v, s in self.value_count.items()]
+
+    def has_full_house(self, cards):
+        value_list = [s for v, s in self._get_value_count(cards).items()]
+        vals = []
         if value_list.count(2) >= 1 and value_list.count(3) == 1 or value_list.count(4) == 1:
-            return True
+            sorted_cards = sorted(cards, key=lambda x: x.get_card_value(), reverse=True)
+            return [sorted_cards[0].value, sorted_cards[3].value]
         return False
 
+
+    def has_4ok(self, cards):
+        for k, v in self._get_value_count(cards).items():
+            if v == 4:
+                return k
+        return False
+
+
+
+    def has_straight_flush(self, cards):
+        return False
+
+
+
+    def has_royal_flush(self, cards):
+        values = ['A','K','Q','J','10']
+        suit_list = [s for v, s in self._get_suit_count(cards).items()]
+        if suit_list.count(5) == 1:
+            for x, y in self._get_suit_count(cards).items():
+                if y == 5:
+                    flush_cards = [i for i in cards if i.suit == x]
+            for card in flush_cards:
+                if card.value in values:
+                    values.remove(card.value)
+            if len(values) == 0:
+                return [x, 'WOW!!']
+        return False
+            
+
+    def comparison_dict(self, cards):
+        
+        return {'High Card': self.get_high_card(cards),
+                    'Pair': self.has_pair(cards),
+                    'Two Pair': self.has_two_pair(cards),
+                    'Three of Kind': self.has_3ok(cards),
+                    'Full House': self.has_full_house(cards),
+                    'Flush': self.has_flush(cards),
+                    'Straight': self.has_straight(cards),
+                    'Four of Kind': self.has_4ok(cards),
+                    'Straight Flush': self.has_straight_flush(cards),
+                    'Royal Flush': self.has_royal_flush(cards)}
+
+
+
+
+# Still need to add final ordering logic for delivery
     
-
-
-    def has_4ok(self):
-        return False
-
-    def has_straight_flush(self):
-        return False
-
-    def has_royal_flush(self):
-        return False
-
-
-
-
-    def comparison_dict(self):
-        return {'High Card': self.get_high_card(),
-                    'Pair': self.has_pair(),
-                    'Two Pair': self.has_two_pair(),
-                    'Three of Kind': self.has_3ok(),
-                    'Full House': self.has_full_house(),
-                    'Flush': self.has_flush(),
-                    'Straight': self.has_straight(),
-                    'Four of Kind': self.has_4ok(),
-                    'Straight Flush': self.has_straight_flush(),
-                    'Royal Flush': self.has_royal_flush()}
-
-
-
-
-    # Returns a list with highest play /
-    # any card(s) value neccessary /
-    # tiebreakers
-    
-    def get_result(self):
-        for level in PokerHandRanker.RANKING:
-            if self.comparison_dict()[level] == True:
-                return level
-        return self.get_high_card()
+    def compare(self, players_list):
+        result = []
+        for player in players_list: 
+            for level in PokerHandRanker.RANKING:
+                primary = self.comparison_dict(player.hand)[level]
+                if primary != False:
+                    result.append((player, level, primary))
+                    break
+        return result
+                                  
 
 
 
@@ -208,17 +238,11 @@ if __name__ == '__main__':
     our_game.add_player('corey')
     our_game.add_player('tyler')
     our_game.add_player('chelsea')
-    our_game.add_player('mommy')
-    print('START OF THE GAME')
-    our_game.play_one_round()
+    our_game.add_player('mom')
+    print('Simulating three rounds')
     print()
-    for player, cards in our_game.final_dict.items():
-        print('{}\'s high card is {}, HAVE PAIR? {}, HAVE TWO PAIR? {}, HAVE 3OK? {}, VALUE COUNTER -->{}, SUIT COUNTER --> {}'.format(player.name,
-                                                            PokerHandRanker(cards).get_high_card(),
-                                                            PokerHandRanker(cards).has_pair(),
-                                                            PokerHandRanker(cards).has_two_pair(),
-                                                            PokerHandRanker(cards).has_3ok(),
-                                                            PokerHandRanker(cards).value_count,
-                                                            PokerHandRanker(cards).suit_count))
+    for count in range(3):
+        our_game.simulate_round()
+    
 
         
